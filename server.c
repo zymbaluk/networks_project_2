@@ -20,7 +20,8 @@
 
 #define PORTNUM 6969
 
-
+//prototypes
+struct gbnpacket build_ack(int sequence_number); 
 
 
 int main(int argc, char *argv[]) {
@@ -81,10 +82,40 @@ int main(int argc, char *argv[]) {
 	}
 
 	printf("The server's UDP port number is %d\n", ntohs(server.sin_port));
+	
+	struct sockaddr_in client;
+	int n=0;
+	int len = sizeof(client);
+
+	int sequence_number = 0;
+
+	while(1) {
+		struct gbnpacket current_packet;
+		n = recvfrom(
+			ld, 
+			&current_packet,
+			sizeof(current_packet),
+			0,
+			(struct sockaddr *) &client,
+			&len);
+		
+		printf("received message!\n\n");
+		printf("%s", current_packet.data);
+	}
 
 	return(0);
 
 }
+
+struct gbnpacket build_ack(int sequence_number) {
+	struct gbnpacket packet;
+	packet.type = 2;
+	packet.sequence_number = sequence_number;
+	packet.length = 0;
+	memset( packet.data, 0, PACKET_SIZE );
+	return packet;
+}
+
 
 
 

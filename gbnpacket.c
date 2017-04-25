@@ -3,7 +3,7 @@
  * Type enum:
  * 	0 - kill packet. show's over
  * 	1 - normal data packet
- * 	2 - name packet. This packet is what you should name the file you're about to recieve
+ * 	2 - ACK
  */
 #define PACKET_SIZE 512
 struct gbnpacket {

@@ -86,7 +86,22 @@ int main(int argc, char *argv[]) {
 	server.sin_port = htons(PORTNUM);
 
 	struct gbnpacket window[window_size];
+	
+	int i;
 
+	for(i=0; i<window_size; i++) {
+		shift_by_one(window, window_size, file);
+	}
+	
+	for(i=0; i<window_size; i++) {
+		sendto(
+			sk,
+			&window[i],
+			sizeof(window[0]),
+			0,
+			(struct sockaddr *) &server,
+			sizeof(server));
+	}
 	
 /*
  * 	We should be able to send now through 
