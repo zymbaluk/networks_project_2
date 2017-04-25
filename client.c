@@ -26,6 +26,7 @@
 
 // globals
 int sequence_number = 0;
+int send_flag = 1;
 
 //prototypes
 struct gbnpacket next_packet(FILE *file); 
@@ -35,36 +36,37 @@ void shift_by_one(struct gbnpacket *window, size_t window_size, FILE *file);
 int main(int argc, char *argv[]) {
 	//ensure we have the right number of args
 	if (argc != 4) {
-		printf("Usage: %s <file> <gbn|saw> <server-name>\n",
+		printf("Usage: %s <server name> <xfer file> <gbn|saw> \n",
 			argv[0]);
 		exit(1);
 	}
 
 	FILE *file;
 	//Attempt to open file, and ensure it's valid
-	file = fopen(argv[1], "rb");
+	file = fopen(argv[2], "rb");
 	if (file == NULL) {
 		printf("file %s not valid!\n",
-			argv[1]);
+			argv[2]);
 		exit(1);
 	}
 
 	int window_size;
 	//Determine whether we're using GBN or SAW and swet window_size
-	if (strcmp(argv[2],"gbn") != 0 && strcmp(argv[2],"saw") != 0) {
+	if (strcmp(argv[3],"gbn") != 0 && strcmp(argv[3],"saw") != 0) {
 		printf("Error: neither GBN nor SAW specified\n");
 		exit(1);
 	}
-	if (strcmp(argv[2], "gbn") == 0) {
+	if (strcmp(argv[3], "gbn") == 0) {
 		window_size = WINDOWGBN;
 	} 
-	if (strcmp(argv[2], "saw") == 0) {
+	if (strcmp(argv[3], "saw") == 0) {
 		window_size = WINDOWSAW;
 	}
 
 	struct hostent *hp;
-	//The name of the server we're sending to is given as argv[3], it can be an ip address, or the colloquial name of the server (ie blanca or shavano)
-	if ((hp = gethostbyname(argv[3])) == 0 ) {
+	//The name of the server we're sending to is given as argv[1], it can 
+	//be an ip address, or the colloquial name of the server (ie blanca or shavano)
+	if ((hp = gethostbyname(argv[1])) == 0 ) {
 		printf("Invalid or unknown host\n");
 		exit(1);
 	}
