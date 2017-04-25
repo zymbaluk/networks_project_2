@@ -29,6 +29,7 @@ int sequence_number = 0;
 
 //prototypes
 struct gbnpacket next_packet(FILE *file); 
+void shift_by_one(struct gbnpacket *window, size_t window_size, FILE *file);
 
 // Usage: 
 int main(int argc, char *argv[]) {
@@ -61,9 +62,6 @@ int main(int argc, char *argv[]) {
 		window_size = WINDOWSAW;
 	}
 
-	//construct our window of size window_size
-	struct gbnpacket window[window_size];
-
 	struct hostent *hp;
 	//The name of the server we're sending to is given as argv[3], it can be an ip address, or the colloquial name of the server (ie blanca or shavano)
 	if ((hp = gethostbyname(argv[3])) == 0 ) {
@@ -85,9 +83,8 @@ int main(int argc, char *argv[]) {
 	
 	server.sin_port = htons(PORTNUM);
 
-	
-	struct gbnpacket packet = next_packet(file);
-	printf("contents: %s\n", packet.data);
+	struct gbnpacket window[window_size];
+
 	
 /*
  * 	We should be able to send now through 
@@ -99,14 +96,27 @@ int main(int argc, char *argv[]) {
 	return 0;
 }
 
+
 /*
-//Shift our window array over by one
-int shift_by_one(gbnpacket *window, window_size, FILE) {
-	if(size == 1) {
-		//window
+ * This is the function that is called when creating our window and when we've
+ * recieved a good ACK back. This function gets rid of window[0], and shifts 
+ * all other entries by one to the left. Then the last element in window is
+ * filled with the new packet.
+ */
+void shift_by_one(struct gbnpacket *window, size_t window_size, FILE *file) {
+	if(window_size <= 1) { /* implies SAW */
+		window[0] = next_packet(file);
+	}
+	else { /* window_size > 1 implies GBN */
+		int i;
+		for( i=0; i < window_size-1; i++) {
+			window[i] = window[i+1];
+		}
+		window[window_size-1] = next_packet(file);
 	}
 }
-*/
+
+
 struct gbnpacket next_packet(FILE *file) {
 	struct gbnpacket packet;
 	packet.type = 1;
@@ -115,6 +125,11 @@ struct gbnpacket next_packet(FILE *file) {
 	//Now read the data into the packet
 	size_t size = fread( packet.data, sizeof(packet.data[0]), PACKET_SIZE, file);
 	packet.length = size;
+
+	if (size <= 0) {
+		packet.type = 0;
+		memset( packet.data, 0, PACKET_SIZE );
+	}
 
 	return packet;
 }
