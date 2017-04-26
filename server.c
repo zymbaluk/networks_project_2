@@ -57,6 +57,7 @@ int main(int argc, char *argv[]) {
 	
 	double loss_rate;
 	loss_rate = atof(argv[3]);
+	srand((unsigned int)time(NULL));
 
 	int ld;
 	if ((ld = socket(PF_INET, SOCK_DGRAM, 0)) < 0) {
@@ -82,13 +83,13 @@ int main(int argc, char *argv[]) {
 	}
 
 	printf("The server's UDP port number is %d\n", ntohs(server.sin_port));
-	
+
 	struct sockaddr_in client;
 	int n=0;
 	int len = sizeof(client);
 
-	int sequence_number = 0;
-
+	struct gbnpacket rsp_packet;
+	int sequence_number = 1;
 	while(1) {
 		struct gbnpacket current_packet;
 		n = recvfrom(
@@ -98,9 +99,39 @@ int main(int argc, char *argv[]) {
 			0,
 			(struct sockaddr *) &client,
 			&len);
-		
-		printf("received message!\n\n");
-		printf("%s", current_packet.data);
+	
+		if(n>1) {
+			printf("recieved packet %d %d\n", 
+current_packet.sequence_number,
+current_packet.type);
+			if(current_packet.type == 0) {
+				break;
+			}
+
+			if((double)rand()/RAND_MAX < loss_rate) {
+				continue; //lose this one
+			}
+
+			//build acknowledgement packet
+			rsp_packet = build_ack(current_packet.sequence_number);
+			sendto(
+				ld,
+				&rsp_packet,
+				sizeof(rsp_packet),
+				0,
+				(struct sockaddr *) &client,
+				sizeof(client));
+			//
+			if(rsp_packet.sequence_number == sequence_number) {
+				sequence_number++;
+				fwrite(
+					current_packet.data,
+					sizeof(current_packet.data[0]),
+					current_packet.length,
+					file);
+			}
+		}
+
 	}
 
 	return(0);

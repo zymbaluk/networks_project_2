@@ -19,21 +19,24 @@
 #include "gbnpacket.c"
 
 #define TIMEOUT 3
-#define RETRIES 10
+#define RETRIES 1000
 #define PORTNUM 6969
 #define WINDOWGBN 5
 #define WINDOWSAW 1
 
 // globals
-int sequence_number = 0;
+int sequence_number = 1;
 int send_flag = 1;
+int retries = 0;
 
 //prototypes
 struct gbnpacket next_packet(FILE *file); 
 void shift_by_one(struct gbnpacket *window, size_t window_size, FILE *file);
+void catch_alarm(int sig);
 
 // Usage: 
 int main(int argc, char *argv[]) {
+	signal(SIGALRM, catch_alarm);
 	//ensure we have the right number of args
 	if (argc != 4) {
 		printf("Usage: %s <server name> <xfer file> <gbn|saw> \n",
@@ -88,31 +91,93 @@ int main(int argc, char *argv[]) {
 	struct gbnpacket window[window_size];
 	
 	int i;
+	
+	//Fill the window
+	for(i=0; i<window_size; i++) {
+		window[i] = next_packet(file);
+	}
 
-	for(i=0; i<window_size; i++) {
-		shift_by_one(window, window_size, file);
-	}
+	while( (window[0].type != 0) && (retries < RETRIES) ) {
 	
-	for(i=0; i<window_size; i++) {
-		sendto(
-			sk,
-			&window[i],
-			sizeof(window[0]),
-			0,
-			(struct sockaddr *) &server,
-			sizeof(server));
-	}
+		if( send_flag > 0 ) {
+			send_flag = 0;
+
+			//send all packets in the window
+			for(i=0; i<window_size; i++) {
+				int sent_len = sendto(
+					sk,
+					&window[i],
+					sizeof(window[0]),
+					0,
+					(struct sockaddr *) &server,
+					sizeof(server));
+				if(sent_len != sizeof(window[0])) {
+					perror("sent different number of bytes than expected!!!i\n");
+					exit(1);
+				}
+				printf("attempted to send packet");
+			}
+		}
+		// Wait for responses
+		struct sockaddr_in from_server;
+		int from_server_len = sizeof(from_server);
+		struct gbnpacket recd;
+		alarm(TIMEOUT);
+		int response_len;
+		while( 
+			(response_len = recvfrom(
+				sk,
+				&recd,
+				sizeof(recd),
+				0,
+				(struct sockaddr *) &from_server,
+				&from_server_len)) < 0) {
+			if(errno == EINTR) {
+				if (retries < RETRIES) {
+					printf("Timed out, %d more retries...\n", retries);
+					break;
+				}else {
+					printf("Timed out, exiting :(\n");
+					exit(1);	
+				}
+			}else {
+				printf("recvfrom failed :(");
+				exit(1);
+			}
+		}
+		
+		//got response, cancel timeout
+		if(response_len) {
+			alarm(0);//cancel alarm
 	
-/*
- * 	We should be able to send now through 
- *
- * 	n_sent = sendto(sk,buf,buf_len,0,
- * 	                  (struct sockaddr*) &server,sizeof(server));
- */
+			// if we get back the first packet we sent, shift the window by 1 and send the next guy
+			if (recd.sequence_number == window[0].sequence_number) {
+				shift_by_one(window, window_size, file);
+				int sent_len = sendto(
+					sk,
+					&window[window_size-1],
+					sizeof(window[0]),
+					0,
+					(struct sockaddr *) &server,
+					sizeof(server));
+				if(sent_len != sizeof(window[0])) {
+					perror("sent different number of bytes than expected!!!i\n");
+					exit(1);
+				}
+			}else {
+				send_flag = 1;
+			}
+		}
+	}
+	fclose(file);	
 
 	return 0;
 }
 
+void catch_alarm(int sig) {
+	retries++;
+	send_flag=1;
+}
 
 /*
  * This is the function that is called when creating our window and when we've
@@ -137,8 +202,8 @@ void shift_by_one(struct gbnpacket *window, size_t window_size, FILE *file) {
 struct gbnpacket next_packet(FILE *file) {
 	struct gbnpacket packet;
 	packet.type = 1;
-	packet.sequence_number = sequence_number++;
-	
+	packet.sequence_number = sequence_number;
+	sequence_number++;
 	//Now read the data into the packet
 	size_t size = fread( packet.data, sizeof(packet.data[0]), PACKET_SIZE, file);
 	packet.length = size;
