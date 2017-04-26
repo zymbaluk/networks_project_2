@@ -97,7 +97,7 @@ int main(int argc, char *argv[]) {
 		window[i] = next_packet(file);
 	}
 
-	while( (window[0].type != 0) && (retries < RETRIES) ) {
+	while( (window[0].type != 0) ) {
 	
 		if( send_flag > 0 ) {
 			send_flag = 0;
@@ -115,7 +115,6 @@ int main(int argc, char *argv[]) {
 					perror("sent different number of bytes than expected!!!i\n");
 					exit(1);
 				}
-				printf("attempted to send packet");
 			}
 		}
 		// Wait for responses

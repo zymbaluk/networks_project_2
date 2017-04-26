@@ -101,14 +101,12 @@ int main(int argc, char *argv[]) {
 			&len);
 	
 		if(n>1) {
-			printf("recieved packet %d %d\n", 
-current_packet.sequence_number,
-current_packet.type);
 			if(current_packet.type == 0) {
 				break;
 			}
 
 			if((double)rand()/RAND_MAX < loss_rate) {
+				printf("lost a packet\n");
 				continue; //lose this one
 			}
 
